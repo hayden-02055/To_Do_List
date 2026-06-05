@@ -1,0 +1,324 @@
+/* ============================================================
+   To-Do List App 스타일
+   컬러 팔레트 / 뱃지 색상은 SDD 디자인 명세를 따른다.
+   ============================================================ */
+
+:root {
+  /* 컬러 팔레트 — 기본: 흰색/회색, 강조: 시멘트/빨강 */
+  --color-primary: #737373;   /* 시멘트 (강조/주요 액션) */
+  --color-primary-dark: #525252; /* 시멘트 hover */
+  --color-success: #737373;   /* 시멘트 (완료) */
+  --color-danger:  #DC2626;   /* 레드 (삭제/위험) */
+  --color-bg:      #F4F4F5;    /* 배경 (연한 회색) */
+  --color-card:    #FFFFFF;    /* 카드 배경 (흰색) */
+  --color-text:    #18181B;    /* 텍스트 기본 (진회색) */
+  --color-text-sub:#71717A;    /* 텍스트 보조 (회색) */
+  --color-border:  #E4E4E7;    /* 테두리 (연회색) */
+
+  /* 디자인 규칙 */
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --transition: all 0.2s ease;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+/* ---------- Header ---------- */
+.app-header {
+  background-color: var(--color-card);
+  color: var(--color-text);
+  padding: 24px 32px;
+  text-align: center;
+  border-bottom: 3px solid var(--color-primary); /* 초록 강조 라인 */
+}
+
+.app-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.app-header .subtitle {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--color-text-sub);
+}
+
+/* ---------- Layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  max-width: 1100px;
+  margin: 24px auto;
+  padding: 0 24px;
+}
+
+@media (max-width: 768px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Sidebar / Form ---------- */
+.sidebar {
+  align-self: start;
+}
+
+.todo-form {
+  background-color: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.todo-form h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+.todo-form label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-sub);
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+.todo-form input,
+.todo-form textarea,
+.todo-form select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: #fff;
+  color: var(--color-text);
+  transition: var(--transition);
+}
+
+.todo-form input:focus,
+.todo-form textarea:focus,
+.todo-form select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(115, 115, 115, 0.2);
+}
+
+.todo-form textarea {
+  resize: vertical;
+}
+
+.btn-primary {
+  margin-top: 18px;
+  padding: 11px;
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-dark);
+}
+
+/* ---------- Search Bar ---------- */
+.search-bar {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.search-bar .search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.search-bar input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 11px 14px 11px 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: #fff;
+  color: var(--color-text);
+  transition: var(--transition);
+}
+
+.search-bar input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(115, 115, 115, 0.2);
+}
+
+/* ---------- Filter Bar ---------- */
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-bar select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: #fff;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.filter-bar select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* ---------- Todo List / Card ---------- */
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-card {
+  background-color: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  transition: var(--transition);
+}
+
+.todo-card:hover {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* 완료된 카드 */
+.todo-card.done {
+  opacity: 0.6;
+}
+
+.todo-card.done .todo-title {
+  text-decoration: line-through;
+}
+
+.todo-checkbox {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.todo-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.todo-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.todo-description {
+  font-size: 13px;
+  color: var(--color-text-sub);
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.todo-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 뱃지 공통 */
+.badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+/* 우선순위 뱃지 — 높음=빨강 / 중간=회색 / 낮음=초록 */
+.badge.priority-high   { background: #FEE2E2; color: #DC2626; }
+.badge.priority-medium { background: #F4F4F5; color: #52525B; }
+.badge.priority-low    { background: #DCFCE7; color: #16A34A; }
+
+/* 카테고리 뱃지 — 회색 계열로 통일 (라벨로 구분) */
+.badge.category-work,
+.badge.category-personal,
+.badge.category-study,
+.badge.category-other { background: #F4F4F5; color: #3F3F46; }
+
+/* D-day 표시 */
+.todo-dday {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+}
+
+.todo-dday.overdue {
+  color: var(--color-danger);
+}
+
+.todo-dday.today {
+  color: var(--color-primary);
+}
+
+/* 삭제 버튼 */
+.btn-delete {
+  background: none;
+  border: none;
+  color: var(--color-danger);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+
+.btn-delete:hover {
+  background-color: #FEE2E2;
+}
+
+/* 빈 목록 안내 */
+.empty-state {
+  text-align: center;
+  color: var(--color-text-sub);
+  padding: 48px 0;
+  font-size: 15px;
+}

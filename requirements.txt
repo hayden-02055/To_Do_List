@@ -1,0 +1,8 @@
+# Python 3.11~3.13 모두에서 미리 빌드된 wheel을 받도록 하한 버전으로 지정.
+# (pydantic 2.7.0 등 구버전은 Python 3.13용 wheel이 없어 소스 빌드가 필요해
+#  Rust/maturin 컴파일 오류가 발생함)
+fastapi>=0.115.0
+uvicorn>=0.30.0
+pydantic>=2.9.0
+pytest>=8.2.0
+httpx>=0.27.0

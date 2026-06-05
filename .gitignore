@@ -1,0 +1,40 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 가상환경
+.venv/
+venv/
+env/
+ENV/
+
+# 패키징 / 빌드
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# 테스트 / 커버리지
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# 타입체커 / 린터 캐시
+.mypy_cache/
+.ruff_cache/
+
+# ===== 환경 변수 =====
+.env
+.env.*
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp

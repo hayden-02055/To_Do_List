@@ -30,6 +30,9 @@ htmlcov/
 .env
 .env.*
 
+# ===== 영구 저장 데이터 (개인 데이터, 자동 생성) =====
+todo-app/backend/data/
+
 # ===== OS =====
 .DS_Store
 Thumbs.db

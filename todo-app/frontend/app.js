@@ -9,6 +9,19 @@ const CATEGORY_LABEL = { work: '업무', personal: '개인', study: '학습', ot
 const PRIORITY_LABEL = { high: '높음', medium: '중간', low: '낮음' };
 
 /**
+ * [DRY / SSOT] 프론트엔드 이벤트 이름 상수.
+ * 매직 스트링을 곳곳에 흩뿌리면 오타가 런타임에야 드러나므로, 한 곳에서
+ * 관리한다. (백엔드의 TodoEvent와 짝을 이루는 프론트 측 단일 출처)
+ */
+const FrontEvent = Object.freeze({
+  FILTER_CHANGED: 'filter.changed',  // 드롭다운 필터 변경
+  SEARCH_CHANGED: 'search.changed',  // 검색어 입력
+  TODO_SUBMITTED: 'todo.submitted',  // 추가 폼 제출(검증 통과)
+  TODO_TOGGLED: 'todo.toggled',      // 완료 체크박스 토글
+  TODO_DELETED: 'todo.deleted',      // 삭제 버튼 클릭
+});
+
+/**
  * [SRP] 백엔드 API 통신만 담당한다.
  * [캡슐화] baseURL은 #private 필드로 외부에 노출하지 않는다.
  */
@@ -152,7 +165,7 @@ class TodoRenderer {
     checkbox.checked = todo.done;
     checkbox.addEventListener('change', () => {
       // [Observer] 토글 이벤트 발행 → 앱이 받아서 처리
-      this.bus.emit('todo.toggled', todo.id);
+      this.bus.emit(FrontEvent.TODO_TOGGLED, todo.id);
     });
 
     // 본문
@@ -202,7 +215,7 @@ class TodoRenderer {
     delBtn.title = '삭제';
     delBtn.addEventListener('click', () => {
       // [Observer] 삭제 이벤트 발행
-      this.bus.emit('todo.deleted', todo.id);
+      this.bus.emit(FrontEvent.TODO_DELETED, todo.id);
     });
 
     card.append(checkbox, body, delBtn);
@@ -267,14 +280,65 @@ class FilterManager {
   bindEvents() {
     [this.categoryEl, this.priorityEl, this.doneEl].forEach((el) => {
       el.addEventListener('change', () => {
-        this.#bus.emit('filter.changed', this.getFilters());
+        this.#bus.emit(FrontEvent.FILTER_CHANGED, this.getFilters());
       });
     });
 
     // [실시간 검색] oninput으로 입력 즉시 목록 재조회
     this.searchEl.addEventListener('input', () => {
-      this.#bus.emit('search.changed', this.getFilters());
+      this.#bus.emit(FrontEvent.SEARCH_CHANGED, this.getFilters());
     });
+  }
+}
+
+/**
+ * [SRP] 입력 폼(DOM)만 담당한다. — 검증과 데이터 수집까지.
+ * [리팩터링 P1-5] 기존 TodoApp.bindFormEvents()에 뭉쳐 있던 폼 처리 책임을
+ *   FilterManager와 동일한 패턴으로 전담 클래스로 분리했다.
+ *   API 호출은 이 클래스의 책임이 아니므로, 검증을 통과하면
+ *   'todo.submitted' 이벤트만 발행하고 실제 생성은 TodoApp이 처리한다.
+ * [캡슐화] 이벤트 버스(#bus)는 외부에서 직접 접근할 수 없다.
+ */
+class TodoForm {
+  #bus; // [캡슐화] private 필드
+
+  /** @param {FrontEventBus} eventBus */
+  constructor(eventBus) {
+    this.#bus = eventBus;
+    this.form = document.getElementById('todo-form');
+  }
+
+  /**
+   * 폼 제출 이벤트를 바인딩한다.
+   * submit → 데이터 수집 → 검증 → 'todo.submitted' 발행 → 폼 초기화
+   */
+  bindEvents() {
+    this.form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const data = this.#collect();
+      if (!data.title) return; // [검증] 제목은 필수
+
+      // [Observer] 폼 책임은 여기까지 — 실제 생성은 구독자(TodoApp)가 처리
+      this.#bus.emit(FrontEvent.TODO_SUBMITTED, data);
+      this.form.reset();
+    });
+  }
+
+  /**
+   * [캡슐화] 폼 입력값을 API 페이로드 형태로 수집한다. (#private — 내부 전용)
+   * @returns {{title:string, description:string, category:string, priority:string, due_date:?string}}
+   */
+  #collect() {
+    const dueRaw = this.form['due_date'].value;
+    return {
+      title: this.form['title'].value.trim(),
+      description: this.form['description'].value.trim(),
+      category: this.form['category'].value,
+      priority: this.form['priority'].value,
+      // 날짜만 입력되므로 ISO datetime 형태로 변환
+      due_date: dueRaw ? new Date(dueRaw).toISOString() : null,
+    };
   }
 }
 
@@ -288,6 +352,7 @@ class TodoApp {
     this.bus = new FrontEventBus();
     this.renderer = new TodoRenderer('todo-list', this.bus);
     this.filter = new FilterManager(this.bus);
+    this.form = new TodoForm(this.bus);
   }
 
   /**
@@ -295,7 +360,7 @@ class TodoApp {
    */
   async init() {
     this.filter.bindEvents();
-    this.bindFormEvents();
+    this.form.bindEvents();
     this.bindBusEvents();
     await this.refresh();
   }
@@ -304,16 +369,25 @@ class TodoApp {
    * [Observer] 버스 이벤트와 실제 동작을 연결한다.
    */
   bindBusEvents() {
-    this.bus.on('filter.changed', () => this.refresh());
-    this.bus.on('search.changed', () => this.refresh());
-    this.bus.on('todo.added', () => this.refresh());
+    this.bus.on(FrontEvent.FILTER_CHANGED, () => this.refresh());
+    this.bus.on(FrontEvent.SEARCH_CHANGED, () => this.refresh());
 
-    this.bus.on('todo.toggled', async (id) => {
+    this.bus.on(FrontEvent.TODO_SUBMITTED, async (data) => {
+      try {
+        await this.api.create(data);
+        await this.refresh();
+      } catch (err) {
+        console.error(err);
+        alert('할일 추가에 실패했습니다.');
+      }
+    });
+
+    this.bus.on(FrontEvent.TODO_TOGGLED, async (id) => {
       await this.api.toggleDone(id);
       await this.refresh();
     });
 
-    this.bus.on('todo.deleted', async (id) => {
+    this.bus.on(FrontEvent.TODO_DELETED, async (id) => {
       await this.api.delete(id);
       await this.refresh();
     });
@@ -331,38 +405,6 @@ class TodoApp {
       console.error(err);
       alert('서버와 통신할 수 없습니다. 백엔드가 실행 중인지 확인하세요.');
     }
-  }
-
-  /**
-   * 추가 폼 제출 이벤트를 바인딩한다.
-   */
-  bindFormEvents() {
-    const form = document.getElementById('todo-form');
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const dueRaw = form['due_date'].value;
-      const data = {
-        title: form['title'].value.trim(),
-        description: form['description'].value.trim(),
-        category: form['category'].value,
-        priority: form['priority'].value,
-        // 날짜만 입력되므로 ISO datetime 형태로 변환
-        due_date: dueRaw ? new Date(dueRaw).toISOString() : null,
-      };
-
-      if (!data.title) return;
-
-      try {
-        await this.api.create(data);
-        form.reset();
-        // [Observer] 추가 완료 이벤트 발행 → 목록 갱신
-        this.bus.emit('todo.added');
-      } catch (err) {
-        console.error(err);
-        alert('할일 추가에 실패했습니다.');
-      }
-    });
   }
 }
 

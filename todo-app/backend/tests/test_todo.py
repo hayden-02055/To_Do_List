@@ -9,10 +9,13 @@ from typing import List, Optional
 
 import pytest
 
+from errors import TodoNotFoundError
+from events.event_names import TodoEvent
 from events.event_system import EventBus
 from interfaces.repository import AbstractTodoRepository
 from models.enums import Category, Priority
 from models.todo import Todo, TodoCreate
+from repositories.todo_repository import MemoryTodoRepository
 from services.todo_service import TodoService
 
 
@@ -103,8 +106,11 @@ def test_delete_todo(service: TodoService) -> None:
 
 
 def test_delete_nonexistent(service: TodoService) -> None:
-    """존재하지 않는 id 삭제 시 예외(KeyError) 발생 확인."""
-    with pytest.raises(KeyError):
+    """존재하지 않는 id 삭제 시 도메인 예외(TodoNotFoundError) 발생 확인.
+
+    [P1-1] 범용 KeyError가 아니라 도메인 예외를 던지므로 의도가 또렷하다.
+    """
+    with pytest.raises(TodoNotFoundError):
         service.delete_todo("nonexistent-id")
 
 
@@ -206,7 +212,7 @@ def test_filter_and_search_combined(service: TodoService) -> None:
 def test_event_emitted_on_create(service: TodoService, bus: EventBus) -> None:
     """생성 시 'todo.created' 이벤트가 발행되는지 확인."""
     received: list = []
-    bus.on("todo.created", lambda data: received.append(data))
+    bus.on(TodoEvent.CREATED, lambda data: received.append(data))
 
     created = service.create_todo(TodoCreate(title="이벤트 생성"))
 
@@ -217,10 +223,49 @@ def test_event_emitted_on_create(service: TodoService, bus: EventBus) -> None:
 def test_event_emitted_on_delete(service: TodoService, bus: EventBus) -> None:
     """삭제 시 'todo.deleted' 이벤트가 발행되는지 확인."""
     received: list = []
-    bus.on("todo.deleted", lambda data: received.append(data))
+    bus.on(TodoEvent.DELETED, lambda data: received.append(data))
 
     created = service.create_todo(TodoCreate(title="이벤트 삭제"))
     service.delete_todo(created.id)
 
     assert len(received) == 1
     assert received[0] == created.id
+
+
+def test_emit_isolates_subscriber_exception(bus: EventBus) -> None:
+    """[P1-4][Observer] 한 구독자가 예외를 던져도 다른 구독자는 실행된다.
+
+    발행자-구독자의 진짜 독립성: 한 구독자의 실패가 전파되지 않아야 한다.
+    """
+    order: list = []
+
+    def failing(_data) -> None:
+        order.append("failing")
+        raise RuntimeError("구독자 내부 오류")
+
+    def healthy(_data) -> None:
+        order.append("healthy")
+
+    bus.on(TodoEvent.CREATED, failing)
+    bus.on(TodoEvent.CREATED, healthy)
+
+    # 예외가 emit 밖으로 새어 나오지 않아야 한다.
+    bus.emit(TodoEvent.CREATED, None)
+
+    assert order == ["failing", "healthy"]
+
+
+def test_memory_repository_get_by_id_returns_copy() -> None:
+    """[P1-2][LSP] MemoryTodoRepository.get_by_id는 복사본을 반환한다.
+
+    반환값을 외부에서 수정해도 저장소 내부 상태가 바뀌지 않아야,
+    FileRepository와 행동 계약이 동일해진다(안전한 치환).
+    """
+    repo = MemoryTodoRepository()
+    repo.save(Todo(id="x", title="원본"))
+
+    fetched = repo.get_by_id("x")
+    fetched.title = "외부에서 변경"  # 반환된 복사본을 수정
+
+    # 저장소 내부는 영향을 받지 않아야 한다.
+    assert repo.get_by_id("x").title == "원본"

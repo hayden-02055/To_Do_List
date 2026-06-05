@@ -25,8 +25,16 @@ class MemoryTodoRepository(AbstractTodoRepository):
         return list(self._store.values())
 
     def get_by_id(self, todo_id: str) -> Optional[Todo]:
-        """id로 할일을 조회한다. 존재하지 않으면 None을 반환한다."""
-        return self._store.get(todo_id)
+        """id로 할일을 조회한다. 존재하지 않으면 None을 반환한다.
+
+        [LSP] FileRepository가 파일에서 매번 '복사본'을 만들어 반환하는 것과
+              행동 계약을 통일하기 위해, 여기서도 깊은 복사본을 반환한다.
+              이렇게 하면 호출자가 반환값을 수정해도 저장소 내부 상태가
+              바뀌지 않으므로, 두 구현체를 안전하게 치환할 수 있다.
+              (LSP는 시그니처뿐 아니라 행동 계약까지 동일해야 한다.)
+        """
+        todo = self._store.get(todo_id)
+        return todo.model_copy(deep=True) if todo else None
 
     def save(self, todo: Todo) -> Todo:
         """할일을 저장한다. 같은 id가 있으면 갱신, 없으면 신규 추가."""

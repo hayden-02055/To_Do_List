@@ -2,7 +2,6 @@
 
 - Todo:       저장/응답에 사용하는 핵심 도메인 모델
 - TodoCreate: 생성 요청 본문 모델 (서버가 채우는 필드는 제외)
-- TodoUpdate: 수정 요청 본문 모델 (모든 필드 Optional)
 """
 
 from datetime import datetime
@@ -49,17 +48,3 @@ class TodoCreate(BaseModel):
     category: Category = Category.OTHER
     priority: Priority = Priority.MEDIUM
     due_date: Optional[datetime] = None
-
-
-class TodoUpdate(BaseModel):
-    """할일 수정 요청 모델.
-
-    부분 수정을 지원하기 위해 모든 필드를 Optional로 둔다.
-    """
-
-    title: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[Category] = None
-    priority: Optional[Priority] = None
-    due_date: Optional[datetime] = None
-    done: Optional[bool] = None

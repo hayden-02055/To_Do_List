@@ -33,12 +33,19 @@ class EventBus:
     def emit(self, event: str, data: Any = None) -> None:
         """이벤트를 발행하여 등록된 모든 콜백을 실행한다.
 
+        [Observer] 한 구독자에서 예외가 나도 나머지 구독자는 정상 실행되도록
+        각 콜백을 try/except로 격리한다. 이렇게 해야 발행자-구독자의 진짜
+        독립성이 보장된다(한 구독자의 실패가 다른 구독자로 전파되지 않음).
+
         Args:
             event: 발행할 이벤트 이름.
             data: 콜백에 전달할 데이터.
         """
         for callback in self._listeners.get(event, []):
-            callback(data)
+            try:
+                callback(data)
+            except Exception as exc:  # [Observer] 구독자 예외 격리
+                print(f"[EventBus] '{event}' 구독자 처리 실패: {exc}")
 
 
 # 싱글턴 인스턴스 (앱 전역에서 공유한다)

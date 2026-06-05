@@ -2,6 +2,8 @@
 
 from typing import List, Optional
 
+from errors import TodoNotFoundError
+from events.event_names import TodoEvent
 from events.event_system import EventBus
 from interfaces.repository import AbstractTodoRepository
 from models.enums import Category, Priority
@@ -39,7 +41,7 @@ class TodoService:
         """
         todo = Todo(**data.model_dump())
         saved = self._repo.save(todo)
-        self._bus.emit("todo.created", saved)
+        self._bus.emit(TodoEvent.CREATED, saved)
         return saved
 
     def get_todos(
@@ -91,15 +93,15 @@ class TodoService:
             갱신된 Todo 객체.
 
         Raises:
-            KeyError: 해당 id의 할일이 없을 때.
+            TodoNotFoundError: 해당 id의 할일이 없을 때.
         """
         todo = self._repo.get_by_id(todo_id)
         if todo is None:
-            raise KeyError(todo_id)
+            raise TodoNotFoundError(todo_id)
 
         todo.done = not todo.done
         saved = self._repo.save(todo)
-        self._bus.emit("todo.completed", saved)
+        self._bus.emit(TodoEvent.COMPLETED, saved)
         return saved
 
     def delete_todo(self, todo_id: str) -> None:
@@ -109,13 +111,13 @@ class TodoService:
             todo_id: 삭제할 할일의 id.
 
         Raises:
-            KeyError: 해당 id의 할일이 없을 때.
+            TodoNotFoundError: 해당 id의 할일이 없을 때.
         """
         deleted = self._repo.delete(todo_id)
         if not deleted:
-            raise KeyError(todo_id)
+            raise TodoNotFoundError(todo_id)
 
-        self._bus.emit("todo.deleted", todo_id)
+        self._bus.emit(TodoEvent.DELETED, todo_id)
 
     # ── Private (캡슐화된 내부 필터 로직) ──────────────────────────
     # [캡슐화] 아래 메서드들은 '_' prefix로 외부 노출을 막는다.

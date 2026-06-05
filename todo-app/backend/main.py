@@ -12,19 +12,20 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from events.event_system import EventBus, event_bus
+from errors import TodoNotFoundError
+from events.event_names import TodoEvent
+from events.event_system import event_bus
 from models.enums import Category, Priority
 from models.todo import Todo, TodoCreate
-from repositories.todo_repository import MemoryTodoRepository
+from repositories.file_repository import FileRepository
 from services.todo_service import TodoService
 
-# 앱 전역에서 공유하는 저장소 인스턴스(인메모리).
-repository = MemoryTodoRepository()
-
-
-def get_event_bus() -> EventBus:
-    """이벤트 버스 의존성 제공자."""
-    return event_bus
+# [OCP] 저장소만 FileRepository로 교체한다.
+#       TodoService·인터페이스·테스트 코드는 한 줄도 수정하지 않는다 —
+#       확장에는 열려 있고 수정에는 닫혀 있음(OCP)을 실증한다.
+# [싱글턴] 앱 전역에서 공유하는 단일 인스턴스. 요청마다 새로 만들면
+#          파일을 중복으로 읽으므로 전역 인스턴스로 관리한다.
+repository = FileRepository()
 
 
 def get_service() -> TodoService:
@@ -52,9 +53,10 @@ async def lifespan(app: FastAPI):
     def log_deleted(todo_id: str) -> None:
         print(f"[EVENT] todo.deleted   -> id={todo_id}")
 
-    event_bus.on("todo.created", log_created)
-    event_bus.on("todo.completed", log_completed)
-    event_bus.on("todo.deleted", log_deleted)
+    # [SSOT] 매직 스트링 대신 TodoEvent 상수로 구독한다. (P1-3)
+    event_bus.on(TodoEvent.CREATED, log_created)
+    event_bus.on(TodoEvent.COMPLETED, log_completed)
+    event_bus.on(TodoEvent.DELETED, log_deleted)
 
     print("[lifespan] EventBus 구독자 등록 완료")
     yield
@@ -64,10 +66,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="To-Do List Management App", lifespan=lifespan)
 
 # [CORS] 프론트엔드(브라우저)에서 직접 호출할 수 있도록 허용한다.
+# allow_origins="*" 와 allow_credentials=True 는 명세상 함께 쓸 수 없다.
+# 현재 인증(쿠키/자격증명)을 사용하지 않으므로 credentials=False 가 올바르다.
+# 추후 인증 도입 시 allow_origins 를 구체 도메인으로 명시한다. (P0-2)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -111,7 +116,8 @@ def toggle_todo(
     """
     try:
         return service.toggle_done(todo_id)
-    except KeyError:
+    except TodoNotFoundError:
+        # [SRP] 도메인 예외를 HTTP 계층 언어(404)로 번역한다. (P1-1)
         raise HTTPException(status_code=404, detail="Todo not found")
 
 
@@ -126,5 +132,6 @@ def delete_todo(
     """
     try:
         service.delete_todo(todo_id)
-    except KeyError:
+    except TodoNotFoundError:
+        # [SRP] 도메인 예외를 HTTP 계층 언어(404)로 번역한다. (P1-1)
         raise HTTPException(status_code=404, detail="Todo not found")

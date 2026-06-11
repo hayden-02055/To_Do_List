@@ -12,7 +12,7 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from errors import TodoNotFoundError
+from errors import TodoNotFoundError, FileIOError
 from events.event_names import TodoEvent
 from events.event_system import event_bus
 from models.enums import Category, Priority
@@ -101,8 +101,27 @@ def create_todo(
     data: TodoCreate,
     service: TodoService = Depends(get_service),
 ) -> Todo:
-    """새 할일을 생성한다."""
-    return service.create_todo(data)
+    """새 할일을 생성한다.
+
+    [v4] FileIOError 발생 시 503(서비스 불가)을 반환한다.
+    toggle_done / delete_todo와 예외처리 패턴을 통일한다.
+
+    리팩터링 이전(Bad):
+        예외처리 없음 — FileRepository._save()가 실패하면
+        FastAPI가 500을 반환하지만 클라이언트에 아무 메시지도 없음.
+
+    리팩터링 이후(Good):
+        FileIOError를 잡아 503으로 번역.
+        [SRP] 도메인 예외 → HTTP 상태 코드 번역 책임을 API 계층이 담당.
+    """
+    try:
+        return service.create_todo(data)
+    except FileIOError as e:
+        # [SRP] 도메인 예외를 HTTP 계층 언어(503)로 번역한다.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"데이터 저장에 실패했습니다: {e}",
+        )
 
 
 @app.patch("/todos/{todo_id}", response_model=Todo)
@@ -113,12 +132,18 @@ def toggle_todo(
     """할일의 완료 상태를 토글한다.
 
     존재하지 않는 id면 404를 반환한다.
+    [v4] FileIOError 예외처리 추가.
     """
     try:
         return service.toggle_done(todo_id)
     except TodoNotFoundError:
         # [SRP] 도메인 예외를 HTTP 계층 언어(404)로 번역한다. (P1-1)
         raise HTTPException(status_code=404, detail="Todo not found")
+    except FileIOError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"데이터 저장에 실패했습니다: {e}",
+        )
 
 
 @app.delete("/todos/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -129,9 +154,15 @@ def delete_todo(
     """할일을 삭제한다. 성공 시 204(No Content)를 반환한다.
 
     존재하지 않는 id면 404를 반환한다.
+    [v4] FileIOError 예외처리 추가.
     """
     try:
         service.delete_todo(todo_id)
     except TodoNotFoundError:
         # [SRP] 도메인 예외를 HTTP 계층 언어(404)로 번역한다. (P1-1)
         raise HTTPException(status_code=404, detail="Todo not found")
+    except FileIOError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"데이터 저장에 실패했습니다: {e}",
+        )

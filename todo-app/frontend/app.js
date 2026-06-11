@@ -382,14 +382,30 @@ class TodoApp {
       }
     });
 
+    // [v4] try/catch 추가 — TODO_SUBMITTED와 패턴 통일
+    // 리팩터링 이전(Bad):
+    //   await this.api.toggleDone(id);  // 예외 터지면 unhandled rejection
+    //   await this.refresh();
+    // 리팩터링 이후(Good): 서버 503 등 에러를 잡아 사용자에게 안내
     this.bus.on(FrontEvent.TODO_TOGGLED, async (id) => {
-      await this.api.toggleDone(id);
-      await this.refresh();
+      try {
+        await this.api.toggleDone(id);
+        await this.refresh();
+      } catch (err) {
+        console.error(err);
+        alert('완료 상태 변경에 실패했습니다.');
+      }
     });
 
+    // [v4] try/catch 추가 — TODO_SUBMITTED와 패턴 통일
     this.bus.on(FrontEvent.TODO_DELETED, async (id) => {
-      await this.api.delete(id);
-      await this.refresh();
+      try {
+        await this.api.delete(id);
+        await this.refresh();
+      } catch (err) {
+        console.error(err);
+        alert('삭제에 실패했습니다.');
+      }
     });
   }
 

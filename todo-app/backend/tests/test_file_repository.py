@@ -1,12 +1,18 @@
-"""FileRepository 파일 I/O 단위 테스트 (v3 선택 추가).
+"""FileRepository 파일 I/O 단위 테스트 (v3 선택 추가, v4 확장).
 
 기존 test_todo.py는 MockRepository를 주입하므로 저장소 교체와 무관하다(DIP).
 이 파일은 FileRepository 자체의 영구 저장 동작을 직접 검증한다.
 임시 디렉터리(tmp_path)를 사용해 실제 데이터 파일을 건드리지 않는다.
+
+[v4 추가] FileIOError 발생/폴백 경로를 검증한다.
 """
 
+import builtins
 import os
 
+import pytest
+
+from errors import FileIOError
 from repositories.file_repository import FileRepository
 from models.todo import Todo
 
@@ -45,3 +51,36 @@ def test_file_repository_delete(tmp_path) -> None:
     assert FileRepository(path=path).get_by_id(saved.id) is None
     # 없는 id 삭제 시 False
     assert repo.delete("nonexistent") is False
+
+
+def test_load_returns_empty_on_corrupt_json(tmp_path) -> None:
+    """손상된 JSON 파일을 읽으면 빈 dict를 반환한다 (폴백 정책 검증).
+
+    [v4] _read_raw()의 JSONDecodeError 폴백 — 데이터 유실보다 서비스 지속 우선.
+    """
+    path = tmp_path / "todos.json"
+    path.write_text("{ invalid json }", encoding="utf-8")
+    repo = FileRepository(path=str(path))
+    assert repo.get_all() == []
+
+
+def test_save_raises_on_permission_error(tmp_path, monkeypatch) -> None:
+    """파일 쓰기 권한이 없으면 FileIOError를 발생시킨다.
+
+    [v4] _save()의 OSError → FileIOError 변환 — 쓰기 실패는 폴백 없이 명시적 전파.
+    """
+    path = tmp_path / "todos.json"
+    repo = FileRepository(path=str(path))
+
+    # open()을 가로채 쓰기 모드일 때만 OSError를 던지도록 한다.
+    original_open = builtins.open
+
+    def mock_open(file, mode="r", **kwargs):
+        if "w" in mode and str(path) in str(file):
+            raise OSError("Permission denied")
+        return original_open(file, mode, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", mock_open)
+
+    with pytest.raises(FileIOError):
+        repo.save(Todo(title="test"))
